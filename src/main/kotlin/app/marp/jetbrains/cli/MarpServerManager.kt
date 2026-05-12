@@ -3,6 +3,7 @@ package app.marp.jetbrains.cli
 import app.marp.jetbrains.notification.MarpNotifications
 import app.marp.jetbrains.service.MarpApplicationService
 import app.marp.jetbrains.settings.MarpSettings
+import app.marp.jetbrains.util.MarpConfig
 import app.marp.jetbrains.util.PathUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
@@ -77,8 +78,17 @@ class MarpServerManager(private val project: Project) : Disposable {
             return Result.failure(e)
         }
 
+        val configFile = MarpConfig.findConfigFile(projectRoot)
+        if (configFile != null) {
+            log.info("Using Marp config file at $configFile")
+        }
+
         val args = buildList {
             add("--server")
+            if (configFile != null) {
+                add("--config-file")
+                add(configFile.toString())
+            }
             if (allowLocalFiles) add("--allow-local-files")
             add(projectRoot.toString())
         }
