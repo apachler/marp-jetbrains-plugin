@@ -13,10 +13,13 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.VirtualFile
 import java.io.IOException
+import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
@@ -103,8 +106,52 @@ class MarpServerManager(private val project: Project) : Disposable {
         val newState = ServerState(process, port, projectRoot)
         state.set(newState)
         watchProcess(newState, marp, allowLocalFiles)
-        listeners.forEach { runCatching { it() } }
+        awaitReadiness(newState)
         return Result.success(Unit)
+    }
+
+    /**
+     * Poll the marp server's TCP port until it accepts connections, then
+     * notify listeners on the EDT. If the process exits or the deadline lapses
+     * before that happens, log and bail — the panel will keep its placeholder
+     * and rely on the next refresh / retry.
+     */
+    private fun awaitReadiness(s: ServerState) {
+        Thread {
+            val deadline = System.currentTimeMillis() + READINESS_TIMEOUT_MS
+            while (System.currentTimeMillis() < deadline) {
+                if (!s.process.isAlive) {
+                    log.warn("Marp server exited before becoming ready on port ${s.port}")
+                    return@Thread
+                }
+                if (probePort(s.port)) {
+                    if (s.ready.compareAndSet(false, true) && state.get() === s) {
+                        ApplicationManager.getApplication().invokeLater {
+                            listeners.forEach { runCatching { it() } }
+                        }
+                    }
+                    return@Thread
+                }
+                try {
+                    Thread.sleep(READINESS_POLL_MS)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return@Thread
+                }
+            }
+            log.warn("Marp server did not become ready within ${READINESS_TIMEOUT_MS}ms on port ${s.port}")
+        }.apply { name = "marp-server-readiness"; isDaemon = true; start() }
+    }
+
+    private fun probePort(port: Int): Boolean {
+        return try {
+            Socket().use { sock ->
+                sock.connect(InetSocketAddress("127.0.0.1", port), READINESS_CONNECT_TIMEOUT_MS)
+                true
+            }
+        } catch (_: IOException) {
+            false
+        }
     }
 
     private fun watchProcess(s: ServerState, marp: Path, allowLocalFiles: Boolean) {
@@ -156,13 +203,16 @@ class MarpServerManager(private val project: Project) : Disposable {
     /** URL for previewing the given .md file (relative to project root). */
     fun getPreviewUrl(file: VirtualFile): String? {
         val s = state.get() ?: return null
-        if (!s.process.isAlive) return null
+        if (!s.process.isAlive || !s.ready.get()) return null
         val rel = PathUtil.relativePathInProject(project, file) ?: return null
         val encoded = PathUtil.encodePathSegments(rel)
         return "http://localhost:${s.port}/$encoded"
     }
 
-    fun isRunning(): Boolean = state.get()?.process?.isAlive == true
+    fun isRunning(): Boolean {
+        val s = state.get() ?: return false
+        return s.process.isAlive && s.ready.get()
+    }
 
     /** Stop the server. Called automatically on dispose. */
     fun stop() {
@@ -184,9 +234,18 @@ class MarpServerManager(private val project: Project) : Disposable {
         listeners.clear()
     }
 
-    private data class ServerState(val process: Process, val port: Int, val root: Path)
+    private class ServerState(
+        val process: Process,
+        val port: Int,
+        val root: Path,
+        val ready: AtomicBoolean = AtomicBoolean(false),
+    )
 
     companion object {
+        private const val READINESS_TIMEOUT_MS = 10_000L
+        private const val READINESS_POLL_MS = 100L
+        private const val READINESS_CONNECT_TIMEOUT_MS = 250
+
         fun getInstance(project: Project): MarpServerManager = project.service()
 
         @Suppress("unused")
