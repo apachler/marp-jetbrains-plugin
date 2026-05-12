@@ -26,8 +26,16 @@
     <depends>org.intellij.plugins.markdown</depends>
 
     <extensions defaultExtensionNs="com.intellij">
+        <fileEditorProvider
+            implementation="app.marp.jetbrains.preview.MarpPreviewFileEditorProvider"/>
+        <projectService
+            serviceImplementation="app.marp.jetbrains.service.MarpProjectService"/>
+        <projectService
+            serviceImplementation="app.marp.jetbrains.cli.MarpServerManager"/>
         <applicationService
             serviceImplementation="app.marp.jetbrains.service.MarpApplicationService"/>
+        <applicationService
+            serviceImplementation="app.marp.jetbrains.settings.MarpSettings"/>
         <notificationGroup
             id="Marp"
             displayType="BALLOON"
