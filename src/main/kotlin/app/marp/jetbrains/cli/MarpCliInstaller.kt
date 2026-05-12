@@ -157,19 +157,42 @@ class MarpCliInstaller(private val nodeJs: NodeJsLocation) {
 
     private fun marpBinary(): String = if (SystemInfo.isWindows) "marp.cmd" else "marp"
 
-    private fun resolveCacheRoot(): Path {
-        val home = System.getProperty("user.home")
-        return when {
-            SystemInfo.isWindows -> {
-                val local = System.getenv("LOCALAPPDATA")
-                    ?: "$home${java.io.File.separator}AppData${java.io.File.separator}Local"
-                Paths.get(local, "marp-jetbrains")
-            }
-            SystemInfo.isMac -> Paths.get(home, "Library", "Caches", "marp-jetbrains")
-            else -> {
-                val xdg = System.getenv("XDG_CACHE_HOME")
-                if (!xdg.isNullOrBlank()) Paths.get(xdg, "marp-jetbrains")
-                else Paths.get(home, ".cache", "marp-jetbrains")
+    private fun resolveCacheRoot(): Path = cacheRootFor(
+        isWindows = SystemInfo.isWindows,
+        isMac = SystemInfo.isMac,
+        userHome = System.getProperty("user.home"),
+        env = System.getenv(),
+    )
+
+    companion object {
+        /**
+         * Compute the per-OS cache root for marp-cli installation. Pure
+         * function — no filesystem access, no service lookup — so it's
+         * exercised by unit tests independent of the IntelliJ runtime.
+         *
+         * Layout:
+         * - Linux:   `$XDG_CACHE_HOME/marp-jetbrains` (fallback `~/.cache/marp-jetbrains`)
+         * - macOS:   `~/Library/Caches/marp-jetbrains`
+         * - Windows: `%LOCALAPPDATA%\marp-jetbrains` (fallback `<home>\AppData\Local\marp-jetbrains`)
+         */
+        fun cacheRootFor(
+            isWindows: Boolean,
+            isMac: Boolean,
+            userHome: String,
+            env: Map<String, String?>,
+        ): Path {
+            return when {
+                isWindows -> {
+                    val local = env["LOCALAPPDATA"]
+                        ?: "$userHome${java.io.File.separator}AppData${java.io.File.separator}Local"
+                    Paths.get(local, "marp-jetbrains")
+                }
+                isMac -> Paths.get(userHome, "Library", "Caches", "marp-jetbrains")
+                else -> {
+                    val xdg = env["XDG_CACHE_HOME"]
+                    if (!xdg.isNullOrBlank()) Paths.get(xdg, "marp-jetbrains")
+                    else Paths.get(userHome, ".cache", "marp-jetbrains")
+                }
             }
         }
     }
