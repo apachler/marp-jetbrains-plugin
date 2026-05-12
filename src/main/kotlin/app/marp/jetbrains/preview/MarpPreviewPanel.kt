@@ -100,11 +100,26 @@ class MarpPreviewPanel(
 
     private fun reload() {
         if (browser == null) return
+        // Marp CLI reads the source file from disk; in-memory edits must be flushed
+        // first or the preview re-renders stale content. The Marp server's own
+        // WebSocket-based auto-reload will fire when the file changes on disk;
+        // the explicit browser.reload() below is a safety net for cases where the
+        // WebSocket connection has been dropped (e.g. after suspend/resume).
+        saveDocumentIfNeeded()
+
         val cef = browser.cefBrowser
         if (cef.url.isNullOrBlank()) {
             loadOrPlaceholder()
         } else {
             cef.reload()
+        }
+    }
+
+    private fun saveDocumentIfNeeded() {
+        val document = FileDocumentManager.getInstance().getDocument(file) ?: return
+        val fdm = FileDocumentManager.getInstance()
+        if (fdm.isDocumentUnsaved(document)) {
+            fdm.saveDocument(document)
         }
     }
 
