@@ -158,7 +158,8 @@ class MarpServerManager(private val project: Project) : Disposable {
         val s = state.get() ?: return null
         if (!s.process.isAlive) return null
         val rel = PathUtil.relativePathInProject(project, file) ?: return null
-        return "http://localhost:${s.port}/$rel"
+        val encoded = PathUtil.encodePathSegments(rel)
+        return "http://localhost:${s.port}/$encoded"
     }
 
     fun isRunning(): Boolean = state.get()?.process?.isAlive == true
