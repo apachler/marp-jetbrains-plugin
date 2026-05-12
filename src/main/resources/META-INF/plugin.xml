@@ -3,6 +3,35 @@
     <name>Marp for JetBrains</name>
     <vendor email="apachler@paan-systems.com" url="https://github.com/apachler">apachler</vendor>
 
+    <description><![CDATA[
+        <p>Live preview of <a href="https://marp.app">Marp</a> Markdown
+        presentations inside JetBrains IDEs.</p>
+
+        <h3>Features</h3>
+        <ul>
+            <li>Live preview of Marp Markdown in a split editor tab</li>
+            <li>Hot-reload on edit</li>
+            <li>Auto-install of Marp CLI (requires Node.js 18+)</li>
+            <li>Configurable Node.js / Marp CLI paths</li>
+        </ul>
+
+        <h3>Requirements</h3>
+        <ul>
+            <li>Node.js 18 or newer installed on your system</li>
+            <li>IntelliJ Platform 2024.3 or newer</li>
+        </ul>
+    ]]></description>
+
     <depends>com.intellij.modules.platform</depends>
     <depends>org.intellij.plugins.markdown</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+            serviceImplementation="app.marp.jetbrains.service.MarpApplicationService"/>
+        <notificationGroup
+            id="Marp"
+            displayType="BALLOON"
+            bundle="messages.MarpBundle"
+            key="notification.group.name"/>
+    </extensions>
 </idea-plugin>
