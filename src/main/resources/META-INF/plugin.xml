@@ -36,6 +36,11 @@
             serviceImplementation="app.marp.jetbrains.service.MarpApplicationService"/>
         <applicationService
             serviceImplementation="app.marp.jetbrains.settings.MarpSettings"/>
+        <applicationConfigurable
+            parentId="tools"
+            instance="app.marp.jetbrains.settings.MarpSettingsConfigurable"
+            id="app.marp.jetbrains.settings"
+            displayName="Marp"/>
         <notificationGroup
             id="Marp"
             displayType="BALLOON"
