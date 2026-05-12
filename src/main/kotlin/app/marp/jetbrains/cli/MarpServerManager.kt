@@ -214,15 +214,40 @@ class MarpServerManager(private val project: Project) : Disposable {
         return s.process.isAlive && s.ready.get()
     }
 
-    /** Stop the server. Called automatically on dispose. */
+    /**
+     * Stop the server. Called automatically on dispose.
+     *
+     * Walks `ProcessHandle.descendants()` because on Windows `marp.cmd` is a
+     * batch wrapper around `node.exe`; killing only the parent leaves an orphan
+     * Node process holding the port. We collect descendants *before* destroying
+     * the parent (afterward the tree is gone), then escalate to destroyForcibly
+     * on anything still alive after the grace period.
+     */
     fun stop() {
         val s = state.getAndSet(null) ?: return
         try {
-            if (s.process.isAlive) {
-                s.process.destroy()
-                if (!s.process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
-                    s.process.destroyForcibly()
+            if (!s.process.isAlive) return
+
+            val descendants = runCatching { s.process.descendants().toList() }
+                .getOrDefault(emptyList())
+
+            s.process.destroy()
+            descendants.forEach { runCatching { it.destroy() } }
+
+            val deadline = System.currentTimeMillis() + STOP_GRACE_MS
+            while (System.currentTimeMillis() < deadline) {
+                if (!s.process.isAlive && descendants.none { it.isAlive }) break
+                try {
+                    Thread.sleep(STOP_POLL_MS)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
                 }
+            }
+
+            if (s.process.isAlive) s.process.destroyForcibly()
+            descendants.forEach { handle ->
+                if (handle.isAlive) runCatching { handle.destroyForcibly() }
             }
         } catch (e: Exception) {
             log.debug("Error stopping marp server", e)
@@ -245,6 +270,8 @@ class MarpServerManager(private val project: Project) : Disposable {
         private const val READINESS_TIMEOUT_MS = 10_000L
         private const val READINESS_POLL_MS = 100L
         private const val READINESS_CONNECT_TIMEOUT_MS = 250
+        private const val STOP_GRACE_MS = 2_000L
+        private const val STOP_POLL_MS = 50L
 
         fun getInstance(project: Project): MarpServerManager = project.service()
 
