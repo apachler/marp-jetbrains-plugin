@@ -78,13 +78,46 @@ class MarpSettingsComponent {
         target.allowLocalFiles = allowLocalFilesCheckbox.isSelected
     }
 
-    fun isModified(state: MarpSettings.State): Boolean {
-        return nodeJsPathField.text.trim().ifBlank { null } != state.nodeJsPath ||
-            marpCliPathField.text.trim().ifBlank { null } != state.marpCliPath ||
-            marpCliVersionField.text.trim() != state.marpCliVersion &&
-                !(marpCliVersionField.text.isBlank() && state.marpCliVersion == "latest") ||
-            (refreshDelaySpinner.value as Number).toInt() != state.previewRefreshDelayMs ||
-            autoOpenCheckbox.isSelected != state.autoOpenPreview ||
-            allowLocalFilesCheckbox.isSelected != state.allowLocalFiles
+    fun isModified(state: MarpSettings.State): Boolean = computeIsModified(
+        state = state,
+        nodeJsPathRaw = nodeJsPathField.text,
+        marpCliPathRaw = marpCliPathField.text,
+        marpCliVersionRaw = marpCliVersionField.text,
+        refreshDelay = (refreshDelaySpinner.value as Number).toInt(),
+        autoOpen = autoOpenCheckbox.isSelected,
+        allowLocalFiles = allowLocalFilesCheckbox.isSelected,
+    )
+
+    companion object {
+        /**
+         * Pure dirty-state computation: returns true iff applying the given UI
+         * values to [state] would actually change it. Extracted from the
+         * instance method so the dirty-state matrix is testable without
+         * booting Swing / the IntelliJ Platform.
+         *
+         * Treats a blank version field as equivalent to "latest" because
+         * [MarpSettingsComponent.apply] does the same on persist.
+         */
+        fun computeIsModified(
+            state: MarpSettings.State,
+            nodeJsPathRaw: String,
+            marpCliPathRaw: String,
+            marpCliVersionRaw: String,
+            refreshDelay: Int,
+            autoOpen: Boolean,
+            allowLocalFiles: Boolean,
+        ): Boolean {
+            val typedVersion = marpCliVersionRaw.trim()
+            val blankFieldMeansLatest =
+                marpCliVersionRaw.isBlank() && state.marpCliVersion == "latest"
+            val versionModified = typedVersion != state.marpCliVersion && !blankFieldMeansLatest
+
+            return nodeJsPathRaw.trim().ifBlank { null } != state.nodeJsPath ||
+                marpCliPathRaw.trim().ifBlank { null } != state.marpCliPath ||
+                versionModified ||
+                refreshDelay != state.previewRefreshDelayMs ||
+                autoOpen != state.autoOpenPreview ||
+                allowLocalFiles != state.allowLocalFiles
+        }
     }
 }
