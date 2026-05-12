@@ -11,9 +11,26 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew check
-      - run: ./gradlew verifyPlugin
-      - uses: actions/upload-artifact@v4
+      - name: Run checks (tests + plugin metadata)
+        run: ./gradlew check
+      - name: Verify plugin against recommended IDEs
+        run: ./gradlew verifyPlugin
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/
+            build/test-results/
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage
+          path: build/reports/jacoco/
+      - name: Upload plugin distribution
+        uses: actions/upload-artifact@v4
         with:
           name: plugin-distribution
           path: build/distributions/*.zip

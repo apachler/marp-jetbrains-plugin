@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.intellij.platform)
     alias(libs.plugins.changelog)
+    jacoco
 }
 
 group = "app.marp.jetbrains"
@@ -59,7 +60,38 @@ intellijPlatform {
     }
 }
 
-tasks.test { useJUnitPlatform() }
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.test {
+    useJUnitPlatform()
+    finalizedBy(tasks.named("jacocoTestReport"))
+}
+
+tasks.named<JacocoReport>("jacocoTestReport") {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+}
+
+tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn(tasks.test)
+    violationRules {
+        // Soft floor: we want to know when overall coverage regresses, but
+        // anything under MUST_BE_GREATER_THAN won't fail the build until the
+        // pure-logic packages reach the per-package 80 % target documented in
+        // TODO §2.4. Tighten this once integration tests land.
+        rule {
+            limit {
+                minimum = "0.50".toBigDecimal()
+            }
+        }
+    }
+}
 
 changelog {
     version = project.version.toString()
