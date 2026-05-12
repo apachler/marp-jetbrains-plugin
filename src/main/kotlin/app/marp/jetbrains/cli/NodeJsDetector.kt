@@ -107,13 +107,25 @@ object NodeJsDetector {
         return null
     }
 
-    private fun parseSemver(input: String): IntArray? {
+    /**
+     * Parse a Node.js-style version string into a (major, minor, patch) array,
+     * or null when [input] is not a recognisable three-part semver. Strips a
+     * leading `v` and any pre-release / build suffix on the patch component
+     * (e.g. `v18.0.0-rc.1` → `[18, 0, 0]`).
+     *
+     * Exposed `internal` so tests can exercise the parser without invoking
+     * the disk / PATH heuristics in [detect].
+     */
+    internal fun parseSemver(input: String): IntArray? {
         val trimmed = input.removePrefix("v")
+        if (trimmed.isEmpty()) return null
         val parts = trimmed.split('.', limit = 4)
         if (parts.size < 3) return null
         val nums = IntArray(3)
         for (i in 0..2) {
-            nums[i] = parts[i].takeWhile { it.isDigit() }.toIntOrNull() ?: return null
+            val token = parts[i].takeWhile { it.isDigit() }
+            if (token.isEmpty()) return null
+            nums[i] = token.toIntOrNull() ?: return null
         }
         return nums
     }

@@ -37,4 +37,46 @@ class NodeJsDetectorTest {
             assert(result.path != dir) { "Directory must not be treated as node executable" }
         }
     }
+
+    // --- parseSemver coverage ------------------------------------------------
+
+    @Test
+    fun `parseSemver - simple three-part with v prefix`() {
+        val v = NodeJsDetector.parseSemver("v18.0.0")!!
+        org.junit.jupiter.api.Assertions.assertArrayEquals(intArrayOf(18, 0, 0), v)
+    }
+
+    @Test
+    fun `parseSemver - simple three-part without v prefix`() {
+        val v = NodeJsDetector.parseSemver("20.10.1")!!
+        org.junit.jupiter.api.Assertions.assertArrayEquals(intArrayOf(20, 10, 1), v)
+    }
+
+    @Test
+    fun `parseSemver - strips pre-release suffix on patch`() {
+        val v = NodeJsDetector.parseSemver("v22.5.0-rc.1")!!
+        org.junit.jupiter.api.Assertions.assertArrayEquals(intArrayOf(22, 5, 0), v)
+    }
+
+    @Test
+    fun `parseSemver - rejects two-part version`() {
+        assertNull(NodeJsDetector.parseSemver("v18.5"))
+    }
+
+    @Test
+    fun `parseSemver - rejects empty string`() {
+        assertNull(NodeJsDetector.parseSemver(""))
+        assertNull(NodeJsDetector.parseSemver("v"))
+    }
+
+    @Test
+    fun `parseSemver - rejects non-numeric major`() {
+        assertNull(NodeJsDetector.parseSemver("vfoo.0.0"))
+    }
+
+    @Test
+    fun `parseSemver - rejects garbage between numbers`() {
+        // Patch component has leading non-digits → empty digit run → null.
+        assertNull(NodeJsDetector.parseSemver("v18.0.abc"))
+    }
 }
