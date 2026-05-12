@@ -2,9 +2,9 @@ package app.marp.jetbrains.preview
 
 import app.marp.jetbrains.cli.MarpServerManager
 import app.marp.jetbrains.settings.MarpSettings
+import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -17,7 +17,9 @@ import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import java.awt.BorderLayout
 import java.awt.FlowLayout
+import javax.swing.BoxLayout
 import javax.swing.JButton
+import javax.swing.JPanel
 import javax.swing.SwingConstants
 
 class MarpPreviewPanel(
@@ -25,26 +27,38 @@ class MarpPreviewPanel(
     private val file: VirtualFile,
 ) : JBPanel<MarpPreviewPanel>(BorderLayout()), Disposable {
 
-    private val log = Logger.getInstance(MarpPreviewPanel::class.java)
+    private enum class Mode { PLACEHOLDER, BROWSER, JCEF_DISABLED }
+
     private val browser: JBCefBrowser? = if (JBCefApp.isSupported()) JBCefBrowser() else null
     private val refresher: DebouncedRefresher
-    private val serverListener: () -> Unit = { ApplicationManager.getApplication().invokeLater { loadOrPlaceholder() } }
     private val documentListener: DocumentListener
+    private val serverListener: () -> Unit = ::onServerStarted
+
+    private val placeholderHolder = JBPanel<JBPanel<*>>(BorderLayout())
+    private val placeholderLabel = JBLabel("", SwingConstants.CENTER)
+    private val retryButton = JButton("Retry")
+    private val helpButton = JButton("Help")
+
+    private var currentMode: Mode? = null
 
     init {
         val delay = MarpSettings.getInstance().state.previewRefreshDelayMs
         refresher = DebouncedRefresher(this, delay) { reload() }
         Disposer.register(this, refresher)
 
-        if (browser != null) {
-            Disposer.register(this, browser)
-            add(browser.component, BorderLayout.CENTER)
+        if (browser != null) Disposer.register(this, browser)
+
+        retryButton.addActionListener {
+            MarpServerManager.getInstance(project).stop()
+            startServerAndLoad()
         }
+        helpButton.addActionListener {
+            BrowserUtil.browse(JCEF_DOCS_URL)
+        }
+        buildPlaceholderHolder()
 
         documentListener = object : DocumentListener {
-            override fun documentChanged(event: DocumentEvent) {
-                scheduleRefresh()
-            }
+            override fun documentChanged(event: DocumentEvent) = scheduleRefresh()
         }
         FileDocumentManager.getInstance().getDocument(file)?.addDocumentListener(documentListener, this)
 
@@ -54,40 +68,85 @@ class MarpPreviewPanel(
         startServerAndLoad()
     }
 
+    private fun buildPlaceholderHolder() {
+        val content = JPanel()
+        content.layout = BoxLayout(content, BoxLayout.Y_AXIS)
+        placeholderLabel.alignmentX = CENTER_ALIGNMENT
+        content.add(placeholderLabel)
+        val buttons = JPanel(FlowLayout(FlowLayout.CENTER, 8, 8))
+        buttons.add(retryButton)
+        buttons.add(helpButton)
+        buttons.alignmentX = CENTER_ALIGNMENT
+        content.add(buttons)
+
+        placeholderHolder.add(content, BorderLayout.CENTER)
+    }
+
     private fun startServerAndLoad() {
         val serverManager = MarpServerManager.getInstance(project)
         serverManager.startIfNeeded()
         loadOrPlaceholder()
     }
 
+    /** Called from MarpServerManager on the EDT when the server is ready. */
+    private fun onServerStarted() {
+        ApplicationManager.getApplication().invokeLater {
+            loadOrPlaceholder()
+            // Trailing refresh: render the most recent edit that arrived while the
+            // server was starting up (debounced refreshes during startup were no-ops).
+            scheduleRefresh()
+        }
+    }
+
     private fun loadOrPlaceholder() {
         if (browser == null) {
-            showPlaceholder("JCEF is not available in this IDE. Please enable the JCEF runtime in IDE settings.")
+            switchMode(
+                Mode.JCEF_DISABLED,
+                "JCEF runtime is not enabled. Open <b>Find Action → Choose Boot Java Runtime for the IDE</b> " +
+                    "and pick the JBR with JCEF, then restart the IDE.",
+                showRetry = false,
+                showHelp = true,
+            )
             return
         }
         val url = MarpServerManager.getInstance(project).getPreviewUrl(file)
         if (url == null) {
-            showPlaceholder("Marp preview is starting…")
+            switchMode(
+                Mode.PLACEHOLDER,
+                "Marp preview is starting…",
+                showRetry = true,
+                showHelp = false,
+            )
         } else {
-            removeAll()
-            add(browser.component, BorderLayout.CENTER)
+            switchMode(Mode.BROWSER, "", showRetry = false, showHelp = false)
             browser.loadURL(url)
-            revalidate()
-            repaint()
         }
     }
 
-    private fun showPlaceholder(message: String) {
-        removeAll()
-        val panel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.CENTER, 12, 12))
-        panel.add(JBLabel(message, SwingConstants.CENTER))
-        val retry = JButton("Retry")
-        retry.addActionListener {
-            MarpServerManager.getInstance(project).stop()
-            startServerAndLoad()
+    private fun switchMode(mode: Mode, message: String, showRetry: Boolean, showHelp: Boolean) {
+        if (currentMode == mode) {
+            // Same mode: just update placeholder text without rebuilding the tree.
+            if (mode != Mode.BROWSER) {
+                placeholderLabel.text = "<html><div style='text-align:center;'>$message</div></html>"
+                retryButton.isVisible = showRetry
+                helpButton.isVisible = showHelp
+            }
+            return
         }
-        panel.add(retry)
-        add(panel, BorderLayout.CENTER)
+
+        currentMode = mode
+        removeAll()
+        when (mode) {
+            Mode.BROWSER -> {
+                add(browser!!.component, BorderLayout.CENTER)
+            }
+            Mode.PLACEHOLDER, Mode.JCEF_DISABLED -> {
+                placeholderLabel.text = "<html><div style='text-align:center;'>$message</div></html>"
+                retryButton.isVisible = showRetry
+                helpButton.isVisible = showHelp
+                add(placeholderHolder, BorderLayout.CENTER)
+            }
+        }
         revalidate()
         repaint()
     }
@@ -126,5 +185,10 @@ class MarpPreviewPanel(
     override fun dispose() {
         MarpServerManager.getInstance(project).removeServerStartedListener(serverListener)
         FileDocumentManager.getInstance().getDocument(file)?.removeDocumentListener(documentListener)
+    }
+
+    companion object {
+        private const val JCEF_DOCS_URL =
+            "https://www.jetbrains.com/help/idea/managing-plugins.html#jcef"
     }
 }
