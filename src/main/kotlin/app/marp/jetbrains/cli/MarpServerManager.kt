@@ -12,13 +12,13 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.messages.Topic
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -30,14 +30,12 @@ class MarpServerManager(private val project: Project) : Disposable {
     private val state = AtomicReference<ServerState?>(null)
     private val restartCount = AtomicInteger(0)
     private val restartWindowStart = AtomicReference<Long>(0L)
-    private val listeners = CopyOnWriteArrayList<() -> Unit>()
 
-    fun addServerStartedListener(listener: () -> Unit) {
-        listeners.add(listener)
-    }
-
-    fun removeServerStartedListener(listener: () -> Unit) {
-        listeners.remove(listener)
+    private fun publishServerReady() {
+        if (project.isDisposed) return
+        runCatching {
+            project.messageBus.syncPublisher(TOPIC).onServerReady()
+        }.onFailure { log.debug("Failed to publish server-ready event", it) }
     }
 
     /** Idempotent: start once, no-op if already running. */
@@ -57,7 +55,6 @@ class MarpServerManager(private val project: Project) : Disposable {
             onReady = {
                 ApplicationManager.getApplication().invokeLater {
                     startIfNeeded()
-                    listeners.forEach { runCatching { it() } }
                 }
             },
             onFailure = { /* notification already shown */ },
@@ -126,9 +123,7 @@ class MarpServerManager(private val project: Project) : Disposable {
                 }
                 if (probePort(s.port)) {
                     if (s.ready.compareAndSet(false, true) && state.get() === s) {
-                        ApplicationManager.getApplication().invokeLater {
-                            listeners.forEach { runCatching { it() } }
-                        }
+                        ApplicationManager.getApplication().invokeLater { publishServerReady() }
                     }
                     return@Thread
                 }
@@ -256,7 +251,6 @@ class MarpServerManager(private val project: Project) : Disposable {
 
     override fun dispose() {
         stop()
-        listeners.clear()
     }
 
     private class ServerState(
@@ -273,9 +267,23 @@ class MarpServerManager(private val project: Project) : Disposable {
         private const val STOP_GRACE_MS = 2_000L
         private const val STOP_POLL_MS = 50L
 
+        /**
+         * Project-bus topic fired when the Marp server has bound its port and
+         * is ready to serve preview requests. Subscribers should connect via
+         * `project.messageBus.connect(disposable)` so the subscription
+         * disposes deterministically with their owning component.
+         */
+        @JvmField
+        val TOPIC: Topic<MarpServerListener> =
+            Topic.create("Marp server", MarpServerListener::class.java)
+
         fun getInstance(project: Project): MarpServerManager = project.service()
 
         @Suppress("unused")
         fun marpBinary(): String = if (SystemInfo.isWindows) "marp.cmd" else "marp"
     }
+}
+
+interface MarpServerListener {
+    fun onServerReady()
 }

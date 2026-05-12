@@ -1,5 +1,6 @@
 package app.marp.jetbrains.preview
 
+import app.marp.jetbrains.cli.MarpServerListener
 import app.marp.jetbrains.cli.MarpServerManager
 import app.marp.jetbrains.settings.MarpSettings
 import com.intellij.ide.BrowserUtil
@@ -32,7 +33,6 @@ class MarpPreviewPanel(
     private val browser: JBCefBrowser? = if (JBCefApp.isSupported()) JBCefBrowser() else null
     private val refresher: DebouncedRefresher
     private val documentListener: DocumentListener
-    private val serverListener: () -> Unit = ::onServerStarted
 
     private val placeholderHolder = JBPanel<JBPanel<*>>(BorderLayout())
     private val placeholderLabel = JBLabel("", SwingConstants.CENTER)
@@ -62,8 +62,14 @@ class MarpPreviewPanel(
         }
         FileDocumentManager.getInstance().getDocument(file)?.addDocumentListener(documentListener, this)
 
-        val serverManager = MarpServerManager.getInstance(project)
-        serverManager.addServerStartedListener(serverListener)
+        // MessageBus subscription disposes automatically with `this` — no manual
+        // removeListener call needed, no risk of leaking on dispose-after-dispatch.
+        project.messageBus.connect(this).subscribe(
+            MarpServerManager.TOPIC,
+            object : MarpServerListener {
+                override fun onServerReady() = this@MarpPreviewPanel.onServerStarted()
+            },
+        )
 
         startServerAndLoad()
     }
@@ -183,7 +189,6 @@ class MarpPreviewPanel(
     }
 
     override fun dispose() {
-        MarpServerManager.getInstance(project).removeServerStartedListener(serverListener)
         FileDocumentManager.getInstance().getDocument(file)?.removeDocumentListener(documentListener)
     }
 
