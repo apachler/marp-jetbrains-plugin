@@ -11,7 +11,10 @@ object Frontmatter {
      */
     fun parse(text: String): Map<String, String>? {
         if (text.isEmpty()) return null
-        val lines = text.lineSequence().iterator()
+        // Strip a leading UTF-8 BOM if present — files saved by Notepad or some
+        // exporters embed one and would otherwise fail the delimiter match.
+        val sanitized = if (text.startsWith('﻿')) text.substring(1) else text
+        val lines = sanitized.lineSequence().iterator()
         if (!lines.hasNext()) return null
         val first = lines.next()
         if (!DELIMITER.matches(first)) return null
