@@ -1,0 +1,8 @@
+<idea-plugin>
+    <id>app.marp.jetbrains</id>
+    <name>Marp for JetBrains</name>
+    <vendor email="apachler@paan-systems.com" url="https://github.com/apachler">apachler</vendor>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.intellij.plugins.markdown</depends>
+</idea-plugin>
