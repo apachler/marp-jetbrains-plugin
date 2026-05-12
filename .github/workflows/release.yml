@@ -2,16 +2,58 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish to Marketplace (e.g. v0.1.0). Must already exist.'
+        required: true
+        type: string
+      confirm:
+        description: 'Type "yes" to confirm publishing to JetBrains Marketplace.'
+        required: true
+        default: 'no'
+        type: string
 
 permissions:
   contents: write
 
 jobs:
+  gate:
+    name: Confirm marketplace publish
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require confirm=yes
+        run: |
+          if [ "${{ inputs.confirm }}" != "yes" ]; then
+            echo "::error::Marketplace publish requires confirm='yes'. Received: '${{ inputs.confirm }}'"
+            exit 1
+          fi
+
+  resolve-ref:
+    name: Resolve ref
+    needs: [gate]
+    if: ${{ always() && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.r.outputs.ref }}
+    steps:
+      - id: r
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ref=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
   verify:
     name: Pre-publish gate
+    needs: [resolve-ref]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref }}
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
@@ -20,28 +62,45 @@ jobs:
       - name: Verify plugin against recommended IDEs
         run: ./gradlew verifyPlugin
 
-  release:
-    name: Publish
-    needs: verify
+  draft-github-release:
+    name: Draft GitHub Release
+    needs: [resolve-ref, verify]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref }}
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build
+      - name: Build plugin
         run: ./gradlew buildPlugin
-      - name: Publish to Marketplace
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve-ref.outputs.ref }}
+          files: build/distributions/*.zip
+          generate_release_notes: true
+          draft: true
+          prerelease: ${{ contains(needs.resolve-ref.outputs.ref, '-') }}
+
+  publish-marketplace:
+    name: Publish to JetBrains Marketplace
+    needs: [resolve-ref, verify]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref }}
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Publish plugin
         env:
           JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
         run: ./gradlew publishPlugin
-      - name: Create draft GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/distributions/*.zip
-          generate_release_notes: true
-          draft: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
