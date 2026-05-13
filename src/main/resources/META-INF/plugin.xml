@@ -46,6 +46,10 @@
             displayType="BALLOON"
             bundle="messages.MarpBundle"
             key="notification.group.name"/>
+        <statusBarWidgetFactory
+            id="Marp"
+            order="last"
+            implementation="app.marp.jetbrains.statusbar.MarpStatusBarWidgetFactory"/>
     </extensions>
 
     <actions>
