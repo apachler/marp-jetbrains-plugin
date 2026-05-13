@@ -5,6 +5,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
+import com.intellij.util.messages.Topic
 
 @State(name = "MarpSettings", storages = [Storage("marp.xml")])
 @Service(Service.Level.APP)
@@ -35,6 +36,19 @@ class MarpSettings : PersistentStateComponent<MarpSettings.State> {
     }
 
     companion object {
+        /**
+         * Application-bus topic fired after the settings dialog applies a
+         * change. Listeners receive the pre- and post-state snapshots so they
+         * can decide which side effect (if any) to perform.
+         */
+        @JvmField
+        val TOPIC: Topic<MarpSettingsListener> =
+            Topic.create("Marp settings", MarpSettingsListener::class.java)
+
         fun getInstance(): MarpSettings = service()
     }
+}
+
+interface MarpSettingsListener {
+    fun onSettingsChanged(old: MarpSettings.State, new: MarpSettings.State)
 }

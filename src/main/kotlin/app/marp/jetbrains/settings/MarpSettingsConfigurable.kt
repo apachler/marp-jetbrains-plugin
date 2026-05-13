@@ -3,6 +3,7 @@ package app.marp.jetbrains.settings
 import app.marp.jetbrains.cli.MarpCliInstaller
 import app.marp.jetbrains.cli.NodeJsDetector
 import app.marp.jetbrains.service.MarpApplicationService
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.options.Configurable
 import javax.swing.JComponent
 
@@ -36,7 +37,15 @@ class MarpSettingsConfigurable : Configurable {
 
     override fun apply() {
         val c = component ?: return
-        MarpSettings.getInstance().update { state -> c.apply(state) }
+        val settings = MarpSettings.getInstance()
+        val old = settings.state.copy()
+        settings.update { state -> c.apply(state) }
+        val new = settings.state.copy()
+        if (old != new) {
+            ApplicationManager.getApplication().messageBus
+                .syncPublisher(MarpSettings.TOPIC)
+                .onSettingsChanged(old, new)
+        }
     }
 
     override fun reset() {

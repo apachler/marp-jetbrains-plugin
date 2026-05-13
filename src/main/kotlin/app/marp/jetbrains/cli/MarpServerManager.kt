@@ -3,6 +3,7 @@ package app.marp.jetbrains.cli
 import app.marp.jetbrains.notification.MarpNotifications
 import app.marp.jetbrains.service.MarpApplicationService
 import app.marp.jetbrains.settings.MarpSettings
+import app.marp.jetbrains.settings.MarpSettingsListener
 import app.marp.jetbrains.util.MarpConfig
 import app.marp.jetbrains.util.PathUtil
 import com.intellij.openapi.Disposable
@@ -31,6 +32,39 @@ class MarpServerManager(private val project: Project) : Disposable {
     private val state = AtomicReference<ServerState?>(null)
     private val restartCount = AtomicInteger(0)
     private val restartWindowStart = AtomicReference<Long>(0L)
+
+    init {
+        // Restart the server when settings affecting how it's launched change.
+        // Connection lifetime is tied to this Disposable, so it auto-disposes
+        // when the project closes.
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            MarpSettings.TOPIC,
+            object : MarpSettingsListener {
+                override fun onSettingsChanged(old: MarpSettings.State, new: MarpSettings.State) {
+                    if (!needsRestart(old, new)) return
+                    log.info("Marp settings changed — restarting server")
+                    val cliBinaryChanged = old.nodeJsPath != new.nodeJsPath ||
+                        old.marpCliPath != new.marpCliPath ||
+                        old.marpCliVersion != new.marpCliVersion
+                    if (cliBinaryChanged) {
+                        MarpApplicationService.getInstance().invalidateCache()
+                    }
+                    val wasRunning = state.get() != null
+                    stop()
+                    if (wasRunning) {
+                        ApplicationManager.getApplication().invokeLater { startIfNeeded() }
+                    }
+                }
+            },
+        )
+    }
+
+    private fun needsRestart(old: MarpSettings.State, new: MarpSettings.State): Boolean {
+        return old.allowLocalFiles != new.allowLocalFiles ||
+            old.nodeJsPath != new.nodeJsPath ||
+            old.marpCliPath != new.marpCliPath ||
+            old.marpCliVersion != new.marpCliVersion
+    }
 
     private fun publishServerReady() {
         if (project.isDisposed) return
