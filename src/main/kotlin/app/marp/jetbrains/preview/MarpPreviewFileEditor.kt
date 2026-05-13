@@ -22,6 +22,9 @@ class MarpPreviewFileEditor(
     override fun getName(): String = "Marp Preview"
     override fun getFile(): VirtualFile = file
 
+    /** Force a (debounced) preview refresh — invoked by ReloadMarpPreviewAction. */
+    fun refresh() = panel.scheduleRefresh()
+
     override fun setState(state: FileEditorState) { /* no-op */ }
     override fun getState(level: FileEditorStateLevel): FileEditorState =
         FileEditorState { _, _ -> false }

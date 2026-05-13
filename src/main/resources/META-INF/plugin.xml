@@ -47,4 +47,33 @@
             bundle="messages.MarpBundle"
             key="notification.group.name"/>
     </extensions>
+
+    <actions>
+        <group id="Marp.ToolsGroup"
+               text="Marp"
+               description="Marp preview actions"
+               popup="true"
+               icon="/META-INF/pluginIcon.svg">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </group>
+
+        <action id="Marp.OpenPreview"
+                class="app.marp.jetbrains.actions.OpenMarpPreviewAction"
+                text="Open Marp Preview"
+                description="Open the Marp live preview for this Markdown file"/>
+        <action id="Marp.ReloadPreview"
+                class="app.marp.jetbrains.actions.ReloadMarpPreviewAction"
+                text="Reload Marp Preview"
+                description="Force-reload the Marp preview pane"/>
+
+        <reference id="Marp.OpenPreview">
+            <add-to-group group-id="Marp.ToolsGroup" anchor="first"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </reference>
+        <reference id="Marp.ReloadPreview">
+            <add-to-group group-id="Marp.ToolsGroup" anchor="after" relative-to-action="Marp.OpenPreview"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="Marp.OpenPreview"/>
+        </reference>
+    </actions>
 </idea-plugin>
