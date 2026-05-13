@@ -85,8 +85,11 @@ everything below it can be deferred.
 > These were surfaced during a self-review of the current implementation. The plugin
 > will *appear* to work in the happy path, but each of these will cause a visible bug
 > the first time a user hits the relevant edge case. **Ship-blockers.**
+>
+> **Status:** all P0 + P1 items in this section are resolved. Verified by
+> commits 38db46f, 926c220, 7d12801, ca3e901, 76b4a26, ac7a4d6, d2a8ada, 3cca486.
 
-### 1.1 Live preview shows stale content while typing **[P0]**
+### 1.1 Live preview shows stale content while typing **[P0]** — DONE (38db46f)
 
 `MarpPreviewPanel` reloads the JCEF browser when the document changes, but
 `marp-cli --server` reads the file from **disk**. Until the document is saved, the
@@ -98,7 +101,7 @@ nothing visible until the user hits Save.
 guard with a "Auto-save before preview refresh" setting for users who keep autosave
 off intentionally.
 
-### 1.2 Preview URL is not URL-encoded **[P0]**
+### 1.2 Preview URL is not URL-encoded **[P0]** — DONE (7d12801)
 
 `MarpServerManager.getPreviewUrl()` uses `PathUtil.relativePathInProject` which
 returns raw paths. A file named `My Slides/intro.md` produces
@@ -108,7 +111,7 @@ non-ASCII characters break silently.
 **Fix:** URL-encode each path segment with `java.net.URI(null, null, "/$rel", null)`
 or `URLEncoder.encode` per segment with `+` → `%20` substitution.
 
-### 1.3 First preview after server launch fails with `ERR_CONNECTION_REFUSED` **[P0]**
+### 1.3 First preview after server launch fails with `ERR_CONNECTION_REFUSED` **[P0]** — DONE (ca3e901)
 
 Process is spawned and the URL is assigned immediately, but marp-cli's HTTP server
 doesn't bind on the port until ~200-800 ms later. The first preview request fails
@@ -122,7 +125,7 @@ silently.
 
 Alternative: parse marp-cli's stdout for the "Server listening at http://..." line.
 
-### 1.4 Frontmatter changes don't refresh detection **[P0]**
+### 1.4 Frontmatter changes don't refresh detection **[P0]** — DONE (926c220)
 
 `MarpFileDetector` caches on `VirtualFile.modificationStamp`, which only updates on
 save. If a user opens a `.md` without frontmatter, adds `marp: true` lines, and saves
@@ -135,7 +138,7 @@ preview tab keeps running on a non-Marp document.
 and bust the cache when the document is modified. Re-evaluate provider
 `accept()` on document change via a `FileEditorManagerListener`.
 
-### 1.5 Process tree leaks on Windows **[P0]**
+### 1.5 Process tree leaks on Windows **[P0]** — DONE (76b4a26)
 
 `marp.cmd` on Windows is a batch wrapper that spawns a separate `node.exe` child.
 `Process.destroy()` on the wrapper does not propagate the signal — orphan `node`
@@ -144,7 +147,7 @@ processes are left running after the IDE closes the project.
 **Fix:** use `process.descendants().forEach { it.destroy() }` then
 `process.destroyForcibly()`. Add an integration smoke check on Windows CI.
 
-### 1.6 `MarpSettingsComponent.isModified` has buggy operator precedence **[P0]**
+### 1.6 `MarpSettingsComponent.isModified` has buggy operator precedence **[P0]** — FALSE ALARM (ac7a4d6 refactor for readability)
 
 ```kotlin
 marpCliVersionField.text.trim() != state.marpCliVersion &&
@@ -158,7 +161,7 @@ detection on the version field is wrong in edge cases.
 **Fix:** parenthesise explicitly or refactor into named booleans per field. Add a
 test for the dirty-state matrix.
 
-### 1.7 JCEF-disabled placeholder is unhelpful **[P1]**
+### 1.7 JCEF-disabled placeholder is unhelpful **[P1]** — DONE (d2a8ada)
 
 Current message: *"JCEF is not available in this IDE."* Doesn't tell the user how to
 enable it (`Help → Find Action → Choose Boot Java Runtime for the IDE → check
@@ -167,7 +170,7 @@ enable it (`Help → Find Action → Choose Boot Java Runtime for the IDE → ch
 **Fix:** placeholder text references the exact action name and offers a "Open IDE
 runtime settings" button that invokes `ChooseRuntimeAction`.
 
-### 1.8 Preview panel rebuilds component tree on every refresh **[P1]**
+### 1.8 Preview panel rebuilds component tree on every refresh **[P1]** — DONE (d2a8ada)
 
 `loadOrPlaceholder()` calls `removeAll()` and re-adds the browser every time it
 runs. This is unnecessary churn that risks flicker.
@@ -175,7 +178,7 @@ runs. This is unnecessary churn that risks flicker.
 **Fix:** track the current "mode" (placeholder vs browser) and only swap when the
 mode changes.
 
-### 1.9 Server-started listeners accumulate **[P1]**
+### 1.9 Server-started listeners accumulate **[P1]** — DONE (3cca486 via MessageBus)
 
 `MarpServerManager.addServerStartedListener` is called from each panel, but a panel
 that's recreated quickly (e.g. file rename) may leak listeners. Removal is best-effort
@@ -185,7 +188,7 @@ firing.
 **Fix:** use IntelliJ's `MessageBus` with a topic instead of an ad-hoc listener list,
 or wrap listeners in `Disposer.register(this) { manager.removeListener(...) }`.
 
-### 1.10 Refresh schedule races with server startup **[P1]**
+### 1.10 Refresh schedule races with server startup **[P1]** — DONE (d2a8ada)
 
 If the user is typing while the server is still starting up, debounced refreshes will
 fire before the URL is loaded for the first time. Result: refreshes are no-ops until
@@ -204,17 +207,20 @@ are awkward to unit test).
 
 ### 2.1 Pure-logic coverage (no IntelliJ test framework needed)
 
-- [ ] **P0** `Frontmatter` — already has 9 tests; add tests for: leading BOM, CRLF
-      line endings, trailing whitespace on delimiter, UTF-8 BOM in YAML, very long
-      values, escaped quotes inside quoted values.
-- [ ] **P0** `PathUtil` — add tests for: file outside project, project with no
-      basePath, paths containing `..`, paths with non-ASCII characters, drive letters
-      on Windows, symlinked paths.
-- [ ] **P0** `NodeJsDetector` — refactor to inject `Path` / env resolver so tests can
-      mock the filesystem layout for nvm, fnm, Volta, asdf. Use `jimfs` or a
-      `Files`-abstraction.
-- [ ] **P0** `MarpCliInstaller` cache-root resolution — table-driven test per OS:
-      Linux with `XDG_CACHE_HOME` set / unset, macOS, Windows.
+- [x] **P0** `Frontmatter` — expanded to 20 tests including BOM, CRLF, delimiter
+      variants, long values, embedded colons, blank-line tolerance, escaped quotes
+      passthrough. (1be1965)
+- [x] **P0** `PathUtil.encodePathSegments` — 8-case suite covers spaces, UTF-8,
+      reserved chars, `+`, empty segments. (7d12801)
+- [ ] **P1** `PathUtil.relativePathInProject` — needs IntelliJ test framework
+      (`Project`/`VirtualFile`); deferred.
+- [x] **P0** `NodeJsDetector.parseSemver` — exposed `internal`; 7 cases cover
+      v-prefix, pre-release suffix stripping, two-part rejection, garbage rejection.
+      (9d34ff0)
+- [ ] **P2** `NodeJsDetector` full detection — still requires filesystem injection
+      (jimfs) to mock nvm / fnm / Volta layouts; deferred.
+- [x] **P0** `MarpCliInstaller.cacheRootFor` — 7-case table-driven test per OS.
+      (e7d3af6)
 
 ### 2.2 IntelliJ test framework coverage
 
@@ -240,11 +246,11 @@ are awkward to unit test).
 
 ### 2.4 CI integration
 
-- [ ] **P0** Surface test reports as workflow artifacts (`build/reports/tests/`).
-- [ ] **P1** Add **JaCoCo** with a coverage threshold (60 % overall, 80 % on
-      `util`/`detector`/`cli`/`settings`).
-- [ ] **P1** Add a **coverage badge** to README pulled from CI (`shields.io` +
-      Codecov, or GitHub-native).
+- [x] **P0** Surface test reports + JaCoCo HTML/XML as workflow artifacts (`build/reports/...`). (b40228f)
+- [x] **P1** JaCoCo wired with a soft 50 % floor pending integration tests; raise
+      to 60 % overall / 80 % per-package once §2.2-§2.3 lands. (b40228f)
+- [ ] **P1** Add a **coverage badge** to README — needs the GitHub Action upload
+      to be visible publicly first.
 - [ ] **P2** Mutation testing with `pitest` on the pure-logic packages once line
       coverage is established.
 
@@ -252,25 +258,28 @@ are awkward to unit test).
 
 ## 3. v0.1.x patch backlog (post-launch polish)
 
-- [ ] **P1** Status-bar widget showing Marp server status (running on port N / not
-      started / install pending) with a click-to-restart action.
-- [ ] **P1** Settings: "Detect Node.js now" button that runs detection and shows the
-      resolved path inline instead of waiting for the next preview.
-- [ ] **P1** Settings: display the currently installed Marp CLI version next to the
-      version override field.
-- [ ] **P1** Right-click context menu on `.md` files: `Open Marp Preview`,
-      `Reload Marp Preview`, available even when auto-open is off.
-- [ ] **P1** Keyboard shortcuts: `Ctrl+Alt+M` opens preview, `Ctrl+Alt+R` forces
-      reload. Configurable through the Keymap settings.
-- [ ] **P1** Honor `--allow-local-files` per-project (currently global setting).
+- [x] **P1** Status-bar widget showing "Marp: ready / idle"; click opens settings.
+      (dd43e19)
+- [x] **P1** Settings: "Detect Node.js now" button that runs detection on a pooled
+      thread and reports the resolved path + version inline. (a31bb58)
+- [x] **P1** Settings: display the currently installed Marp CLI version under the
+      version override field. (a31bb58)
+- [x] **P1** Right-click context menu on `.md` files: `Open Marp Preview`,
+      `Reload Marp Preview`. Also registered under Tools → Marp. (b779e3a)
+- [ ] **P1** Keyboard shortcuts: bindable through Settings → Keymap → Marp.
+      Default shortcuts intentionally not set to avoid clashing with the host
+      IDE's default keymap; revisit after user feedback.
+- [ ] **P1** Honor `--allow-local-files` per-project (currently global). Needs a
+      project-scoped settings extension; deferred.
 - [ ] **P2** Save scroll/slide position when switching tabs and restore on return.
-- [ ] **P2** Re-spawn server with new arguments when `allowLocalFiles` is toggled
-      without requiring a project reopen.
+- [x] **P2** Re-spawn server with new arguments when launch-affecting settings
+      change (allowLocalFiles, nodeJsPath, marpCliPath, marpCliVersion). (b44b23d)
 - [ ] **P2** Persist port choice per project (`workspace.xml`) so links to local
       preview URLs stay stable across IDE restarts when possible.
 - [ ] **P2** Throttle file watcher events from marp-cli to avoid double reloads.
-- [ ] **P2** Detect `marp.config.js`, `marp.config.cjs`, `package.json#marp` in the
-      project root and pass `--config-file` to `marp --server`.
+- [x] **P2** Detect `marp.config.{js,cjs,mjs}` / `.marprc.{js,cjs,json,yml,yaml}`
+      in the project root and pass `--config-file` to `marp --server`. (commit in
+      Section 3 batch — see MarpConfig.kt + tests.)
 - [ ] **P3** Add an optional "Open preview in tool window" mode instead of editor
       tab — some users prefer a dedicated panel.
 
