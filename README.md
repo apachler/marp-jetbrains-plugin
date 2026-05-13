@@ -1,5 +1,14 @@
 # Marp for JetBrains
 
+[![Build](https://img.shields.io/github/actions/workflow/status/apachler/marp-jetbrains-plugin/build.yml?branch=main&label=build&logo=github)](https://github.com/apachler/marp-jetbrains-plugin/actions/workflows/build.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/apachler/marp-jetbrains-plugin/codeql.yml?branch=main&label=codeql&logo=github)](https://github.com/apachler/marp-jetbrains-plugin/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/github/license/apachler/marp-jetbrains-plugin?color=blue)](./LICENSE)
+[![Marketplace](https://img.shields.io/jetbrains/plugin/v/app.marp.jetbrains?label=marketplace&logo=jetbrains)](https://plugins.jetbrains.com/plugin/app.marp.jetbrains)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/app.marp.jetbrains?label=downloads&logo=jetbrains)](https://plugins.jetbrains.com/plugin/app.marp.jetbrains)
+[![Rating](https://img.shields.io/jetbrains/plugin/r/rating/app.marp.jetbrains?label=rating&logo=jetbrains)](https://plugins.jetbrains.com/plugin/app.marp.jetbrains)
+[![IntelliJ Platform](https://img.shields.io/badge/IntelliJ%20Platform-2024.3%2B-blueviolet?logo=intellijidea)](https://www.jetbrains.com/idea/)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+
 Live preview of [Marp](https://marp.app) Markdown presentations inside JetBrains IDEs.
 
 Mirrors the core experience of the official "Marp for VS Code" extension: open a `.md`
