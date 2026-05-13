@@ -23,15 +23,7 @@ class MarpCliInstaller(private val nodeJs: NodeJsLocation) {
     }
 
     /** Read the pinned installed version, or null. */
-    fun getInstalledVersion(): String? {
-        val file = cacheRoot.resolve(".installed-version")
-        if (!Files.isRegularFile(file)) return null
-        return try {
-            Files.readString(file).trim().ifBlank { null }
-        } catch (_: Exception) {
-            null
-        }
-    }
+    fun getInstalledVersion(): String? = readInstalledVersion(cacheRoot)
 
     /**
      * Install or upgrade to [version]. Reports progress via [indicator].
@@ -165,6 +157,25 @@ class MarpCliInstaller(private val nodeJs: NodeJsLocation) {
     )
 
     companion object {
+        /** Cache root resolved against the current host. */
+        fun resolveCacheRootForCurrentHost(): Path = cacheRootFor(
+            isWindows = SystemInfo.isWindows,
+            isMac = SystemInfo.isMac,
+            userHome = System.getProperty("user.home"),
+            env = System.getenv(),
+        )
+
+        /** Read the pinned installed Marp CLI version, or null. */
+        fun readInstalledVersion(cacheRoot: Path = resolveCacheRootForCurrentHost()): String? {
+            val file = cacheRoot.resolve(".installed-version")
+            if (!Files.isRegularFile(file)) return null
+            return try {
+                Files.readString(file).trim().ifBlank { null }
+            } catch (_: Exception) {
+                null
+            }
+        }
+
         /**
          * Compute the per-OS cache root for marp-cli installation. Pure
          * function — no filesystem access, no service lookup — so it's

@@ -1,11 +1,16 @@
 package app.marp.jetbrains.settings
 
+import app.marp.jetbrains.cli.MarpCliInstaller
+import app.marp.jetbrains.cli.NodeJsDetector
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
+import java.awt.BorderLayout
+import java.awt.FlowLayout
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -15,8 +20,11 @@ import javax.swing.SpinnerNumberModel
 class MarpSettingsComponent {
 
     private val nodeJsPathField = TextFieldWithBrowseButton()
+    private val detectNodeButton = JButton("Detect")
+    private val nodeStatusLabel = JBLabel(" ")
     private val marpCliPathField = TextFieldWithBrowseButton()
     private val marpCliVersionField = JBTextField()
+    private val installedVersionLabel = JBLabel(" ")
     private val refreshDelaySpinner = JSpinner(SpinnerNumberModel(300, 100, 2000, 50))
     private val autoOpenCheckbox = JBCheckBox("Open preview tab automatically for Marp files")
     private val allowLocalFilesCheckbox = JBCheckBox("Allow local file access in Marp preview (less secure)")
@@ -39,16 +47,34 @@ class MarpSettingsComponent {
             null,
             FileChooserDescriptorFactory.createSingleFileDescriptor(),
         )
-        reinstallButton.addActionListener { reinstallAction?.invoke() }
+        reinstallButton.addActionListener {
+            reinstallAction?.invoke()
+            refreshInstalledVersionLabel()
+        }
+        detectNodeButton.addActionListener { runDetection() }
 
         val warningLabel = JBLabel(
             "<html><i>Enabling local file access lets the preview read files outside the project. Use with care.</i></html>"
         )
 
+        val nodeRow = JPanel(BorderLayout(8, 0))
+        nodeRow.add(nodeJsPathField, BorderLayout.CENTER)
+        nodeRow.add(detectNodeButton, BorderLayout.EAST)
+
+        val nodeStatusRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0))
+        nodeStatusRow.add(nodeStatusLabel)
+
+        val versionStatusRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0))
+        versionStatusRow.add(installedVersionLabel)
+
+        refreshInstalledVersionLabel()
+
         panel = FormBuilder.createFormBuilder()
-            .addLabeledComponent(JBLabel("Node.js executable:"), nodeJsPathField, 1, false)
+            .addLabeledComponent(JBLabel("Node.js executable:"), nodeRow, 1, false)
+            .addComponentToRightColumn(nodeStatusRow, 0)
             .addLabeledComponent(JBLabel("Marp CLI executable (override):"), marpCliPathField, 1, false)
             .addLabeledComponent(JBLabel("Marp CLI version:"), marpCliVersionField, 1, false)
+            .addComponentToRightColumn(versionStatusRow, 0)
             .addLabeledComponent(JBLabel("Preview refresh delay (ms):"), refreshDelaySpinner, 1, false)
             .addComponent(autoOpenCheckbox, 1)
             .addComponent(allowLocalFilesCheckbox, 1)
@@ -56,6 +82,30 @@ class MarpSettingsComponent {
             .addComponent(reinstallButton, 1)
             .addComponentFillVertically(JPanel(), 0)
             .panel
+    }
+
+    private fun refreshInstalledVersionLabel() {
+        val installed = MarpCliInstaller.readInstalledVersion()
+        installedVersionLabel.text = if (installed != null) {
+            "Installed: $installed"
+        } else {
+            "Installed: (not yet installed — first preview will install)"
+        }
+    }
+
+    private fun runDetection() {
+        nodeStatusLabel.text = "Detecting…"
+        val override = nodeJsPathField.text.trim().ifBlank { null }
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val result = NodeJsDetector.detect(override)
+            ApplicationManager.getApplication().invokeLater {
+                nodeStatusLabel.text = if (result != null) {
+                    "Found Node.js ${result.version} at ${result.path}"
+                } else {
+                    "Node.js not found — install from https://nodejs.org or set an override above."
+                }
+            }
+        }
     }
 
     fun getPreferredFocusedComponent(): JComponent = nodeJsPathField.textField
