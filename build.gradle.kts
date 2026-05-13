@@ -64,6 +64,26 @@ jacoco {
     toolVersion = "0.8.12"
 }
 
+/**
+ * Classes that can be exercised by pure JUnit (no IntelliJ test framework).
+ * Anything outside this list talks to JCEF / Project / Disposer / etc. and
+ * needs `BasePlatformTestCase`-style fixtures, which the CI sandbox here
+ * cannot run. The coverage gate is scoped to these so the >80 % target
+ * reflects what we actually unit-test, not what we can't.
+ */
+val pureLogicCoverageIncludes = listOf(
+    "app/marp/jetbrains/util/**",
+    "app/marp/jetbrains/detector/MarpFileDetector*",
+    "app/marp/jetbrains/cli/Frontmatter*",
+    "app/marp/jetbrains/cli/MarpCliInstaller*",
+    "app/marp/jetbrains/cli/NodeJsDetector*",
+    "app/marp/jetbrains/cli/ProcessUtil*",
+    "app/marp/jetbrains/settings/MarpSettingsComponent*",
+)
+
+fun pureLogicClassDirs(base: ConfigurableFileCollection) =
+    base.files.map { fileTree(it) { include(pureLogicCoverageIncludes) } }
+
 tasks.test {
     useJUnitPlatform()
     finalizedBy(tasks.named("jacocoTestReport"))
@@ -71,6 +91,9 @@ tasks.test {
 
 tasks.named<JacocoReport>("jacocoTestReport") {
     dependsOn(tasks.test)
+    // Scope the report to pure-logic classes so the coverage % isn't diluted
+    // by JCEF / Project-dependent code we can't exercise here.
+    classDirectories.setFrom(pureLogicClassDirs(classDirectories))
     reports {
         xml.required.set(true)
         html.required.set(true)
@@ -80,17 +103,25 @@ tasks.named<JacocoReport>("jacocoTestReport") {
 
 tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     dependsOn(tasks.test)
+    classDirectories.setFrom(pureLogicClassDirs(classDirectories))
     violationRules {
-        // Soft floor: we want to know when overall coverage regresses, but
-        // anything under MUST_BE_GREATER_THAN won't fail the build until the
-        // pure-logic packages reach the per-package 80 % target documented in
-        // TODO §2.4. Tighten this once integration tests land.
+        // Hard floor on the pure-logic surface — 80 % line coverage. If this
+        // fails, either add tests or shrink pureLogicCoverageIncludes (with a
+        // commit message justifying the removal).
         rule {
             limit {
-                minimum = "0.50".toBigDecimal()
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.80".toBigDecimal()
             }
         }
     }
+}
+
+// Make the coverage gate part of `check` so PRs that drop pure-logic coverage
+// below 80 % fail in CI.
+tasks.named("check") {
+    dependsOn(tasks.named("jacocoTestCoverageVerification"))
 }
 
 changelog {

@@ -1,8 +1,13 @@
 package app.marp.jetbrains.cli
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 
 class MarpCliInstallerTest {
@@ -83,5 +88,57 @@ class MarpCliInstallerTest {
         assertTrue(path.contains("AppData"), "expected AppData in $path")
         assertTrue(path.contains("Local"), "expected Local in $path")
         assertTrue(path.contains("marp-jetbrains"), "expected marp-jetbrains in $path")
+    }
+
+    // --- readInstalledVersion coverage ---------------------------------------
+
+    @Test
+    fun `readInstalledVersion returns null when cache directory does not exist`(@TempDir tmp: Path) {
+        val missing = tmp.resolve("never-created")
+        assertNull(MarpCliInstaller.readInstalledVersion(missing))
+    }
+
+    @Test
+    fun `readInstalledVersion returns null when pin file is absent`(@TempDir cache: Path) {
+        assertNull(MarpCliInstaller.readInstalledVersion(cache))
+    }
+
+    @Test
+    fun `readInstalledVersion reads pin file content`(@TempDir cache: Path) {
+        Files.writeString(cache.resolve(".installed-version"), "1.2.3")
+        assertEquals("1.2.3", MarpCliInstaller.readInstalledVersion(cache))
+    }
+
+    @Test
+    fun `readInstalledVersion trims surrounding whitespace`(@TempDir cache: Path) {
+        Files.writeString(cache.resolve(".installed-version"), "  4.0.1  \n")
+        assertEquals("4.0.1", MarpCliInstaller.readInstalledVersion(cache))
+    }
+
+    @Test
+    fun `readInstalledVersion returns null for blank file`(@TempDir cache: Path) {
+        Files.writeString(cache.resolve(".installed-version"), "   \n  ")
+        assertNull(MarpCliInstaller.readInstalledVersion(cache))
+    }
+
+    @Test
+    fun `readInstalledVersion accepts npm version selectors`(@TempDir cache: Path) {
+        // The pin file stores whatever version selector was used at install
+        // time — usually "latest" or "1.2.3" but also "^4.0.0" is valid.
+        Files.writeString(cache.resolve(".installed-version"), "^4.0.0")
+        assertEquals("^4.0.0", MarpCliInstaller.readInstalledVersion(cache))
+    }
+
+    @Test
+    fun `resolveCacheRootForCurrentHost returns a non-null path`() {
+        // Smoke test — the actual host-specific path is exercised by cacheRootFor
+        // tests above; here we just confirm the live-system overload is wired
+        // and doesn't throw.
+        val root = MarpCliInstaller.resolveCacheRootForCurrentHost()
+        assertNotNull(root)
+        assertTrue(
+            root.toString().contains("marp-jetbrains"),
+            "expected 'marp-jetbrains' in resolved path, got $root",
+        )
     }
 }

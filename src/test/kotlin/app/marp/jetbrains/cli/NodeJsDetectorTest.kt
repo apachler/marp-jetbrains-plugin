@@ -79,4 +79,61 @@ class NodeJsDetectorTest {
         // Patch component has leading non-digits → empty digit run → null.
         assertNull(NodeJsDetector.parseSemver("v18.0.abc"))
     }
+
+    // --- isAcceptableVersionOutput coverage -----------------------------------
+
+    @Test
+    fun `accepts v18 patch zero`() {
+        assertTrue(NodeJsDetector.isAcceptableVersionOutput("v18.0.0"))
+    }
+
+    @Test
+    fun `accepts v20 lts`() {
+        assertTrue(NodeJsDetector.isAcceptableVersionOutput("v20.10.1"))
+    }
+
+    @Test
+    fun `accepts pre-release suffix on v22`() {
+        assertTrue(NodeJsDetector.isAcceptableVersionOutput("v22.5.0-rc.1"))
+    }
+
+    @Test
+    fun `accepts trailing whitespace`() {
+        assertTrue(NodeJsDetector.isAcceptableVersionOutput("v22.5.0\n"))
+        assertTrue(NodeJsDetector.isAcceptableVersionOutput("  v18.0.0  "))
+    }
+
+    @Test
+    fun `rejects v17 as below minimum`() {
+        assertFalse(NodeJsDetector.isAcceptableVersionOutput("v17.9.0"))
+    }
+
+    @Test
+    fun `rejects legacy v0 release`() {
+        assertFalse(NodeJsDetector.isAcceptableVersionOutput("v0.10.48"))
+    }
+
+    @Test
+    fun `rejects empty output`() {
+        assertFalse(NodeJsDetector.isAcceptableVersionOutput(""))
+        assertFalse(NodeJsDetector.isAcceptableVersionOutput("   "))
+    }
+
+    @Test
+    fun `rejects output without leading v`() {
+        assertFalse(NodeJsDetector.isAcceptableVersionOutput("20.0.0"))
+    }
+
+    @Test
+    fun `rejects garbage`() {
+        assertFalse(NodeJsDetector.isAcceptableVersionOutput("v.0.0"))
+        assertFalse(NodeJsDetector.isAcceptableVersionOutput("vfoo.0.0"))
+        assertFalse(NodeJsDetector.isAcceptableVersionOutput("not even close"))
+    }
+
+    @Test
+    fun `rejects integer-only major`() {
+        // Missing the dot+minor portion: major is "" before the first dot.
+        assertFalse(NodeJsDetector.isAcceptableVersionOutput("v22"))
+    }
 }

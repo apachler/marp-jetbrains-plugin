@@ -130,15 +130,30 @@ object NodeJsDetector {
         return nums
     }
 
+    /**
+     * True iff [output] looks like `node --version` output for a release
+     * matching the minimum-major requirement (currently 18). Pure function
+     * extracted from [verify] for test coverage independent of an actual
+     * filesystem.
+     */
+    internal fun isAcceptableVersionOutput(output: String): Boolean {
+        val trimmed = output.trim()
+        if (!trimmed.startsWith("v")) return false
+        val rest = trimmed.removePrefix("v")
+        // Require at least major.minor — `node --version` always emits three
+        // components, so a dotless string can't be a real Node release.
+        if (!rest.contains('.')) return false
+        val major = rest.substringBefore('.').toIntOrNull() ?: return false
+        return major >= MIN_MAJOR
+    }
+
     /** Verify a candidate path is a Node.js executable with major >= 18. */
     private fun verify(candidate: Path): NodeJsLocation? {
         if (!Files.isRegularFile(candidate) || !Files.isExecutable(candidate)) return null
         val res = ProcessUtil.run(candidate, listOf("--version"), timeoutMs = 5_000) ?: return null
         if (!res.success) return null
         val output = res.stdout.trim()
-        if (!output.startsWith("v")) return null
-        val major = output.removePrefix("v").substringBefore('.').toIntOrNull() ?: return null
-        if (major < MIN_MAJOR) return null
+        if (!isAcceptableVersionOutput(output)) return null
         return NodeJsLocation(candidate, output)
     }
 
