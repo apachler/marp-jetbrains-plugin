@@ -1,0 +1,23 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: on-failure
+          license-check: true
+          # MIT-only project; reject GPL family unless explicitly added later.
+          deny-licenses: AGPL-1.0-only, AGPL-3.0-only, AGPL-1.0-or-later, AGPL-3.0-or-later

@@ -1,0 +1,42 @@
+name: Stale Issues and PRs
+
+on:
+  schedule:
+    # Daily at 03:00 UTC.
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-issue-stale: 60
+          days-before-issue-close: 14
+          days-before-pr-stale: 30
+          days-before-pr-close: 14
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+          exempt-issue-labels: 'pinned,security,help wanted'
+          exempt-pr-labels: 'work-in-progress,dependencies'
+          stale-issue-message: |
+            This issue has been automatically marked as stale because it has had
+            no activity for 60 days. It will be closed in 14 days if no further
+            activity occurs. Comment to keep it open.
+          stale-pr-message: |
+            This pull request has been automatically marked as stale because it
+            has had no activity for 30 days. It will be closed in 14 days if no
+            further activity occurs. Comment or push to keep it open.
+          close-issue-message: |
+            This issue was automatically closed because it has been stale for 14
+            days without activity. Please reopen if you have new information.
+          close-pr-message: |
+            This pull request was automatically closed because it has been stale
+            for 14 days without activity. Please reopen if you would like to
+            continue working on it.
+          operations-per-run: 100
