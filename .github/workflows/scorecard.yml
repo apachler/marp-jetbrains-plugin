@@ -1,0 +1,51 @@
+name: OpenSSF Scorecard
+
+# OpenSSF Scorecard scores the repo against a battery of security best-practice
+# checks (branch protection, signed releases, pinned actions, etc.) and uploads
+# the result to GitHub's Security tab. The score is also surfaced via a badge
+# in the README so contributors can see the current posture at a glance.
+
+on:
+  branch_protection_rule: {}
+  schedule:
+    # Weekly on Tuesday at 04:17 UTC — off-peak slot.
+    - cron: '17 4 * * 2'
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # Required for uploading SARIF results to the Security tab.
+      security-events: write
+      # Required for the OIDC token used to publish results to the public
+      # OpenSSF Scorecard API (https://api.securityscorecards.dev).
+      id-token: write
+      # Read-only repo metadata access for the checks themselves.
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@v2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Publishes results to api.securityscorecards.dev so the badge can
+          # link to the public report. Safe — only aggregated scores.
+          publish_results: true
+
+      - name: Upload SARIF results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif

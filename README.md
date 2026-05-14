@@ -2,6 +2,7 @@
 
 [![Build](https://img.shields.io/github/actions/workflow/status/apachler/marp-jetbrains-plugin/build.yml?branch=main&label=build&logo=github)](https://github.com/apachler/marp-jetbrains-plugin/actions/workflows/build.yml)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/apachler/marp-jetbrains-plugin/codeql.yml?branch=main&label=codeql&logo=github)](https://github.com/apachler/marp-jetbrains-plugin/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/apachler/marp-jetbrains-plugin/badge)](https://securityscorecards.dev/viewer/?uri=github.com/apachler/marp-jetbrains-plugin)
 [![License: MIT](https://img.shields.io/github/license/apachler/marp-jetbrains-plugin?color=blue)](./LICENSE)
 [![Marketplace](https://img.shields.io/jetbrains/plugin/v/app.marp.jetbrains?label=marketplace&logo=jetbrains)](https://plugins.jetbrains.com/plugin/app.marp.jetbrains)
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/app.marp.jetbrains?label=downloads&logo=jetbrains)](https://plugins.jetbrains.com/plugin/app.marp.jetbrains)
@@ -107,6 +108,18 @@ cd marp-jetbrains-plugin
 ./gradlew buildPlugin  # produces build/distributions/*.zip
 ./gradlew check verifyPlugin
 ```
+
+## Contributing
+
+Contributions are welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the
+development setup and PR checklist. By participating you agree to the
+[Code of Conduct](./CODE_OF_CONDUCT.md).
+
+## Support
+
+Bug reports and feature requests: see [`SUPPORT.md`](./SUPPORT.md).
+Security vulnerabilities: see [`SECURITY.md`](./SECURITY.md) — please disclose
+privately, not via a public issue.
 
 ## License
 

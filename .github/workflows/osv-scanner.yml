@@ -1,0 +1,30 @@
+name: OSV Scanner
+
+# OSV-Scanner cross-references the project's transitive dependencies against
+# the OSV database (osv.dev). Complements CodeQL (source-level analysis) and
+# Dependency Review (PR-time license + vuln check) by catching CVEs in
+# already-merged deps, including transitively-resolved Gradle dependencies.
+#
+# Uses the reusable workflow form which auto-uploads SARIF to the Security
+# tab and applies the project's lockfile scanning defaults.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly on Monday at 05:43 UTC.
+    - cron: '43 5 * * 1'
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  scan:
+    permissions:
+      # Required for uploading SARIF results to the Security tab.
+      security-events: write
+      contents: read
+      actions: read
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v1.9.1

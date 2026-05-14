@@ -9,6 +9,10 @@ on:
     # Wednesday 07:32 UTC — off-peak slot.
     - cron: '32 7 * * 3'
 
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   actions: read
   contents: read
@@ -18,6 +22,7 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
