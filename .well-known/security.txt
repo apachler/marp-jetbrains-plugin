@@ -1,0 +1,14 @@
+# RFC 9116 security disclosure pointer for the Marp for JetBrains project.
+#
+# Maintained at .well-known/security.txt in the repository root so that if a
+# GitHub Pages site is later served from this repo, the file is automatically
+# available at https://<host>/.well-known/security.txt as the spec requires.
+#
+# Full policy:  https://github.com/apachler/marp-jetbrains-plugin/blob/main/SECURITY.md
+
+Contact: mailto:apachler@paan-systems.com
+Contact: https://github.com/apachler/marp-jetbrains-plugin/security/advisories/new
+Expires: 2027-05-14T00:00:00.000Z
+Preferred-Languages: en
+Policy: https://github.com/apachler/marp-jetbrains-plugin/blob/main/SECURITY.md
+Canonical: https://github.com/apachler/marp-jetbrains-plugin/blob/main/.well-known/security.txt

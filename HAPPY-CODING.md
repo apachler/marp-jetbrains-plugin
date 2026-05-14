@@ -51,26 +51,6 @@ infrastructure, supply-chain, and engineering-practice work.
 
 ## Supply-chain hardening
 
-### Pin all third-party actions to commit SHAs
-
-- **Priority**: P1
-- **Rationale**: OpenSSF Scorecard's `Pinned-Dependencies` check expects SHA
-  pinning. Major-version tags can be silently re-pointed by their maintainers,
-  which is the typical supply-chain compromise pattern (`tj-actions/changed-files`
-  incident, 2025).
-- **Implementation notes**:
-  - Replace e.g. `actions/checkout@v4` with `actions/checkout@<sha> # v4.x.y`.
-  - Dependabot understands the `# version` trailing comment and will keep both
-    SHA and comment in sync.
-  - First-party (`actions/*`, `github/*`) actions are lower risk and can stay
-    on major tags if you'd rather minimise churn — but Scorecard will still
-    flag them.
-- **Tradeoff**: Increases Dependabot PR volume. Mitigation: dependabot.yml
-  already groups `actions/*` updates into one PR.
-- **Expected impact**: +1 to OpenSSF Scorecard score; mitigates a real
-  supply-chain vector.
-- **Effort**: 1 hour the first time; ongoing maintenance handled by Dependabot.
-
 ### Generate SBOM on every release
 
 - **Priority**: P1
@@ -213,13 +193,6 @@ infrastructure, supply-chain, and engineering-practice work.
     correct `URL`s and reload signals against a mock server.
 - **Effort**: 1–2 days for a useful baseline.
 
-### Add a `samples/` directory with sample decks
-
-- **Priority**: P1
-- **Rationale**: TODO §0.3 already calls for this. Doubles as a manual smoke
-  test target and as an example for README screenshots.
-- **Effort**: 1 hour.
-
 ### Track flaky-test runs and quarantine the noisy ones
 
 - **Priority**: P2
@@ -263,15 +236,6 @@ infrastructure, supply-chain, and engineering-practice work.
 - **Implementation notes**: Use `adr-tools` format. One ADR per non-obvious
   decision, not one per change.
 - **Effort**: 30 min per ADR; start with 3–5 of the load-bearing ones.
-
-### Add ROADMAP.md
-
-- **Priority**: P2
-- **Rationale**: TODO.md is comprehensive but ~22 KB — it's a working backlog,
-  not a public roadmap. A short ROADMAP.md (one screenful) signalling
-  near/mid/long-term direction helps prospective contributors and
-  Marketplace visitors.
-- **Effort**: 30 min.
 
 ---
 
@@ -372,15 +336,6 @@ infrastructure, supply-chain, and engineering-practice work.
 ---
 
 ## Compliance
-
-### Add `.well-known/security.txt` equivalent in repo
-
-- **Priority**: P2
-- **Rationale**: `SECURITY.md` already covers disclosure. A `security.txt`
-  at the repo root or `/docs/security.txt` is purely for automated
-  vulnerability disclosure tooling (e.g. `securitytxt.org` scanners). Adds
-  zero maintenance burden.
-- **Effort**: 5 min.
 
 ### Confirm MIT licence compatibility of all transitive deps
 
